@@ -1,0 +1,64 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ / Android Studio related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter / Dart / Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+/android/local.properties
+.gradle/
+**/android/.gradle/
+
+# Android Keystore & Signing Secrets
+*.keystore
+*.jks
+key.properties
+
+# Firebase Configuration & Sensitive Keys (Keep template example only)
+android/app/google-services.json
+firebase.json
+firestore.rules
+firestore-debug.log
+.firebase/
+scripts/
+
+# Hardware & Firmware source (not included in mobile app repo)
+*.ino
+ESP32.ino
+
+# Internal Design & PRD Documentation (Keep only README.md)
+AGENTS.md
+PRD.md
+DESIGN.md
+DESIGN.jpeg
+*.jpeg
+
+# Widget Preview related
+.widget_preview/
