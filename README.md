@@ -175,8 +175,3 @@ flutter test
 ## 📄 Lisensi & Kontribusi
 
 Proyek ini dikembangkan secara independen untuk keperluan pemeliharaan akuarium modern. Silakan ajukan *Issue* atau buat *Pull Request* jika Anda ingin berkontribusi dalam pengembangan aplikasi ini.
-
-Dibuat dengan ❤️ untuk komunitas pecinta ikan & penggemar IoT.
-=======
-# MyFish
->>>>>>> 2a681da6ed5df6bc471c4143dca2dfb90442cb59
