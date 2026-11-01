@@ -38,6 +38,15 @@ class _HistoryPageState extends State<HistoryPage> {
 
   String? get _effectiveUid => widget.uid ?? _authRepository.currentUser?.uid;
 
+  @override
+  void initState() {
+    super.initState();
+    final uid = _effectiveUid;
+    if (uid != null) {
+      _deviceRepository.trimHistory(uid);
+    }
+  }
+
   Map<DateTime, List<HistoryItem>> _groupByDate(List<HistoryItem> items) {
     final map = <DateTime, List<HistoryItem>>{};
     for (final item in items) {
@@ -94,7 +103,10 @@ class _HistoryPageState extends State<HistoryPage> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: const AppHeader(),
+      appBar: AppHeader(
+        authRepository: _authRepository,
+        deviceRepository: _deviceRepository,
+      ),
       body: SafeArea(
         top: false,
         child: Align(
@@ -167,7 +179,7 @@ class _HistoryPageState extends State<HistoryPage> {
                         ),
                         const SizedBox(height: AppSpacing.sm),
 
-                        // Catatan kecil Firestore TTL 30 hari (DESIGN.md §6 & PRD)
+                        // Catatan batas maksimal 25 riwayat tersimpan (FIFO)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.md,
@@ -190,7 +202,7 @@ class _HistoryPageState extends State<HistoryPage> {
                               const SizedBox(width: AppSpacing.sm),
                               Expanded(
                                 child: Text(
-                                  'Riwayat otomatis terhapus setelah 30 hari',
+                                  'Maksimal 25 riwayat tersimpan (data terlama otomatis terhapus)',
                                   style: textTheme.bodySmall?.copyWith(
                                     color: AppColors.textMuted,
                                     fontWeight: FontWeight.w500,

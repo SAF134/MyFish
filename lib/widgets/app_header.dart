@@ -2,14 +2,27 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
+import '../data/auth_repository.dart';
+import '../data/device_repository.dart';
+import '../data/models/device_models.dart';
 
 /// Header atas tetap (fixed header) untuk halaman Beranda, Jadwal, Riwayat,
 /// dan Pengaturan. Posisi tidak bergerak saat pengguna menggulir layar.
 ///
-/// Menampilkan logo MyFish + teks "MyFish" di pojok kiri, serta kluster
-/// dekoratif ikon ikan, air, dan akuarium di kanan untuk mengisi ruang kosong.
+/// Menampilkan logo MyFish + teks "MyFish" di pojok kiri, serta status koneksi
+/// ESP32 dengan desain titik point + Terhubung/Terputus di pojok kanan.
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
-  const AppHeader({super.key});
+  const AppHeader({
+    super.key,
+    this.isOnline,
+    this.authRepository,
+    this.deviceRepository,
+  });
+
+  /// Status koneksi ESP32. Jika null, akan membaca otomatis dari stream Firestore.
+  final bool? isOnline;
+  final AuthRepository? authRepository;
+  final DeviceRepository? deviceRepository;
 
   @override
   Size get preferredSize => const Size.fromHeight(60.0);
@@ -67,10 +80,10 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) =>
                               const Icon(
-                                Icons.set_meal_rounded,
-                                size: 20,
-                                color: AppColors.primary,
-                              ),
+                            Icons.set_meal_rounded,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
                       const SizedBox(width: AppSpacing.sm),
@@ -90,54 +103,11 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
 
                   const Spacer(),
 
-                  // Kluster Ikon: Ikan, Air, dan Akuarium
-                  Semantics(
-                    label: 'Indikator ekosistem: Ikan, Air, dan Akuarium',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceAlt,
-                        borderRadius: AppRadius.pillAll,
-                        border: Border.all(
-                          color: AppColors.border,
-                          width: 1.0,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // 1. Ikon Ikan
-                          _HeaderDecorativeIcon(
-                            icon: Icons.set_meal_rounded,
-                            tooltip: 'Pakan & Kesehatan Ikan',
-                            backgroundColor: AppColors.primaryTint,
-                            iconColor: AppColors.primaryDark,
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-
-                          // 2. Ikon Air
-                          const _HeaderDecorativeIcon(
-                            icon: Icons.water_drop_rounded,
-                            tooltip: 'Kualitas & Kebersihan Air',
-                            backgroundColor: Color(0xFFE0F7FA),
-                            iconColor: Color(0xFF00838F),
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-
-                          // 3. Ikon Akuarium / Gelombang
-                          const _HeaderDecorativeIcon(
-                            icon: Icons.waves_rounded,
-                            tooltip: 'Ekosistem Akuarium Pintar',
-                            backgroundColor: Color(0xFFEDE7F6),
-                            iconColor: Color(0xFF5E35B1),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  // Status ESP32: Titik Tombol Point + Terhubung/Terputus
+                  if (isOnline != null)
+                    _buildStatusPill(textTheme, isOnline!)
+                  else
+                    _buildStreamedStatus(textTheme),
                 ],
               ),
             ),
@@ -146,53 +116,83 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
       ),
     );
   }
-}
 
-class _HeaderDecorativeIcon extends StatefulWidget {
-  const _HeaderDecorativeIcon({
-    required this.icon,
-    required this.tooltip,
-    required this.backgroundColor,
-    required this.iconColor,
-  });
+  Widget _buildStreamedStatus(TextTheme textTheme) {
+    final auth = authRepository ?? AuthRepository();
+    final uid = auth.currentUser?.uid;
 
-  final IconData icon;
-  final String tooltip;
-  final Color backgroundColor;
-  final Color iconColor;
+    if (uid == null) {
+      return _buildStatusPill(textTheme, false);
+    }
 
-  @override
-  State<_HeaderDecorativeIcon> createState() => _HeaderDecorativeIconState();
-}
+    final devRepo = deviceRepository ?? DeviceRepository();
+    return StreamBuilder<DeviceData?>(
+      stream: devRepo.watchDevice(uid),
+      builder: (context, snapshot) {
+        final online = snapshot.data?.isOnline() ?? false;
+        return _buildStatusPill(textTheme, online);
+      },
+    );
+  }
 
-class _HeaderDecorativeIconState extends State<_HeaderDecorativeIcon> {
-  bool _isPressed = false;
+  Widget _buildStatusPill(TextTheme textTheme, bool online) {
+    final statusText = online ? 'Terhubung' : 'Terputus';
+    final dotColor = online ? AppColors.success : AppColors.error;
+    final bgColor = online ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE);
+    final borderColor = online ? const Color(0xFFA5D6A7) : const Color(0xFFEF9A9A);
+    final textColor = online ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
 
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: widget.tooltip,
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _isPressed = true),
-        onTapUp: (_) => setState(() => _isPressed = false),
-        onTapCancel: () => setState(() => _isPressed = false),
-        child: AnimatedScale(
-          scale: _isPressed ? 0.82 : 1.0,
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOutBack,
-          child: Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: widget.backgroundColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              widget.icon,
-              size: 16,
-              color: widget.iconColor,
-            ),
+    return Semantics(
+      label: 'Status ESP32: $statusText',
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 5,
+        ),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: AppRadius.pillAll,
+          border: Border.all(
+            color: borderColor,
+            width: 1.0,
           ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x08000000),
+              blurRadius: 4,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Titik tombol point
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: dotColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: dotColor.withValues(alpha: 0.45),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              statusText,
+              style: textTheme.labelSmall?.copyWith(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+            ),
+          ],
         ),
       ),
     );

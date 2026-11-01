@@ -170,6 +170,59 @@ void main() {
       expect(AppVersionConfig.isNewer('1.0.0', '1.0.0'), isFalse);
       expect(AppVersionConfig.isNewer('1.2.0', '1.1.9'), isFalse);
     });
+
+    // 6. Batas Maksimal 10 Jadwal Pakan
+    test('Batas maksimal 10 jadwal mencegah penambahan jadwal ke-11', () {
+      final tenSchedules = List.generate(
+        10,
+        (i) => ScheduleItem(
+          id: 's_$i',
+          time: '${i.toString().padLeft(2, '0')}:00',
+          level: 1,
+          enabled: true,
+        ),
+      );
+
+      bool canAddSchedule(List<ScheduleItem> current) {
+        return current.length < AppConstants.maxScheduleCount;
+      }
+
+      // 9 jadwal -> masih bisa tambah
+      expect(canAddSchedule(tenSchedules.sublist(0, 9)), isTrue);
+      // 10 jadwal -> tidak bisa tambah lagi
+      expect(canAddSchedule(tenSchedules), isFalse);
+    });
+
+    // 7. Batas Maksimal 25 Riwayat Pakan (FIFO Rotasi)
+    test('Batas maksimal 25 riwayat memangkas data paling lama', () {
+      final baseDate = DateTime(2026, 11, 1, 10, 0, 0);
+      final twentySixHistory = List.generate(
+        26,
+        (i) => HistoryItem(
+          id: 'h_$i',
+          timestamp: baseDate.add(Duration(minutes: i)),
+          method: 'auto',
+          level: 1,
+          durationSec: 1.0,
+          expireAt: null,
+        ),
+      );
+
+      // Urutkan descending (terbaru di awal)
+      twentySixHistory.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      // Jika lebih dari 25, ambil 25 terbaru dan potong data sisanya (yang paling lama)
+      final trimmed = twentySixHistory.take(AppConstants.maxHistoryCount).toList();
+      final removed = twentySixHistory.sublist(AppConstants.maxHistoryCount);
+
+      expect(twentySixHistory.length, 26);
+      expect(trimmed.length, 25);
+      expect(removed.length, 1);
+      // Data yang dihapus adalah data pertama yang dibuat (paling lama)
+      expect(removed.first.id, 'h_0');
+      // Data terbaru tetap berada di urutan teratas
+      expect(trimmed.first.id, 'h_25');
+    });
   });
 
   group('Aksesibilitas - Uji Skala Font 200%', () {

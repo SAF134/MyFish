@@ -13,7 +13,7 @@ import '../../widgets/slide_confirm.dart';
 import '../../widgets/state_views.dart';
 import 'widgets/confirm_action_sheet.dart';
 
-/// Halaman Kontrol ESP32 (Reset & Matikan) - DESIGN.md §6 & §7a.
+/// Halaman Kontrol ESP32 (Reset, Matikan Deep Sleep & Nyalakan Kembali) - DESIGN.md §6 & §7a.
 class Esp32ControlPage extends StatefulWidget {
   const Esp32ControlPage({
     super.key,
@@ -38,6 +38,15 @@ class _Esp32ControlPageState extends State<Esp32ControlPage> {
 
   String? get _effectiveUid => widget.uid ?? _authRepository.currentUser?.uid;
 
+  @override
+  void initState() {
+    super.initState();
+    final uid = _effectiveUid;
+    if (uid != null) {
+      _deviceRepository.cleanCompletedCommands(uid);
+    }
+  }
+
   Future<void> _handleReset(String uid) async {
     // 1. Dialog password re-autentikasi
     final verified = await showPasswordDialog(
@@ -54,11 +63,13 @@ class _Esp32ControlPageState extends State<Esp32ControlPage> {
     final confirmed = await ConfirmActionSheet.show(
       context,
       title: 'Reset Ulang ESP32',
-      message: 'Mikrokontroler ESP32 akan dimulai ulang dari awal. Pastikan tidak ada proses pakan yang sedang berjalan.',
+      message:
+          'Mikrokontroler ESP32 akan dimulai ulang dari awal. Pastikan tidak ada proses pakan yang sedang berjalan.',
       slideLabel: 'Geser untuk reset ESP32',
       variant: SlideConfirmVariant.danger,
       onConfirm: () async {
         await _deviceRepository.sendResetCommand(uid);
+        _deviceRepository.cleanCompletedCommands(uid);
       },
     );
 
@@ -73,7 +84,8 @@ class _Esp32ControlPageState extends State<Esp32ControlPage> {
       context,
       verify: (pwd) => _authRepository.reauthenticate(pwd),
       title: 'Konfirmasi Matikan ESP32',
-      message: 'Masukkan password akun untuk mematikan perangkat alat ke mode deep sleep.',
+      message:
+          'Masukkan password akun untuk mematikan perangkat alat ke mode deep sleep.',
       confirmLabel: 'Lanjut',
     );
 
@@ -83,16 +95,50 @@ class _Esp32ControlPageState extends State<Esp32ControlPage> {
     final confirmed = await ConfirmActionSheet.show(
       context,
       title: 'Matikan ESP32 (Deep Sleep)',
-      message: 'Alat akan masuk mode tidur hemat daya. Untuk menyalakan kembali, tombol fisik pada mikrokontroler perlu ditekan.',
+      message:
+          'Alat akan masuk mode tidur hemat daya mendalam. Anda dapat menyalakannya kembali melalui aplikasi dengan konfirmasi password atau menekan tombol fisik.',
       slideLabel: 'Geser untuk matikan ESP32',
       variant: SlideConfirmVariant.danger,
       onConfirm: () async {
         await _deviceRepository.sendShutdownCommand(uid);
+        _deviceRepository.cleanCompletedCommands(uid);
       },
     );
 
     if (confirmed == true && mounted) {
       AppSnackbar.success(context, 'Perintah matikan terkirim');
+    }
+  }
+
+  Future<void> _handleWakeup(String uid) async {
+    // 1. Dialog password re-autentikasi
+    final verified = await showPasswordDialog(
+      context,
+      verify: (pwd) => _authRepository.reauthenticate(pwd),
+      title: 'Konfirmasi Nyalakan ESP32',
+      message:
+          'Masukkan password akun untuk menyalakan kembali perangkat alat dari mode deep sleep.',
+      confirmLabel: 'Lanjut',
+    );
+
+    if (!verified || !mounted) return;
+
+    // 2. SlideConfirm modal sheet
+    final confirmed = await ConfirmActionSheet.show(
+      context,
+      title: 'Nyalakan Kembali ESP32',
+      message:
+          'Sistem mikrokontroler akan diaktifkan kembali dari mode deep sleep. Sinyal status bangun akan dikirimkan ke cloud.',
+      slideLabel: 'Geser untuk nyalakan ESP32',
+      variant: SlideConfirmVariant.normal,
+      onConfirm: () async {
+        await _deviceRepository.sendWakeupCommand(uid);
+        _deviceRepository.cleanCompletedCommands(uid);
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      AppSnackbar.success(context, 'Perintah menyalakan ESP32 terkirim');
     }
   }
 
@@ -149,7 +195,9 @@ class _Esp32ControlPageState extends State<Esp32ControlPage> {
             child: StreamBuilder<DeviceData?>(
               stream: _deviceRepository.watchDevice(uid),
               builder: (context, snapshot) {
-                final isOnline = snapshot.data?.isOnline() ?? false;
+                final device = snapshot.data;
+                final isOnline = device?.isOnline() ?? false;
+                final isDeepSleep = !isOnline || device?.status == 'off';
 
                 return ListView(
                   padding: const EdgeInsets.all(AppSpacing.screen),
@@ -201,7 +249,7 @@ class _Esp32ControlPageState extends State<Esp32ControlPage> {
                     ),
                     const SizedBox(height: AppSpacing.lg),
 
-                    // Banner Jika Offline
+                    // Banner Jika Offline / Deep Sleep
                     if (!isOnline) ...[
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.md),
@@ -232,7 +280,119 @@ class _Esp32ControlPageState extends State<Esp32ControlPage> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.md),
+
+                      // Informasi Khusus Mode Deep Sleep
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF8E1),
+                          borderRadius: BorderRadius.circular(AppRadius.input),
+                          border: Border.all(
+                            color: const Color(0xFFFFD54F),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.xs),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFFECB3),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.bedtime_rounded,
+                                color: Color(0xFFF57F17),
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'ESP32 Sedang Dimatikan (Mode Deep Sleep)',
+                                    style: textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFFBF360C),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Perangkat mikrokontroler sedang dalam mode deep sleep hemat daya. Anda dapat menyalakan kembali perangkat lewat tombol di bawah dengan konfirmasi password akun, atau menekan tombol fisik EN/daya pada board ESP32.',
+                                    textAlign: TextAlign.justify,
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: const Color(0xFF5D4037),
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: AppSpacing.lg),
+                    ],
+
+                    // Kartu Aksi: Nyalakan ESP32 (Aktif ketika alat sedang deep sleep / offline)
+                    if (isDeepSleep) ...[
+                      AppCard(
+                        enabled: true,
+                        onTap: () => _handleWakeup(uid),
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        semanticLabel: 'Nyalakan ESP32 dari mode deep sleep',
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5E9),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0xFFA5D6A7),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.power_settings_new_rounded,
+                                color: AppColors.success,
+                                size: 26,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.lg),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Nyalakan ESP32',
+                                    style: textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.success,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Bangunkan alat dari mode deep sleep dan aktifkan kembali.',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: AppColors.success,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
                     ],
 
                     // Kartu Aksi 1: Reset Ulang ESP32

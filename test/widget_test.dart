@@ -19,6 +19,7 @@ import 'package:myfish/features/onboarding/onboarding_page.dart';
 import 'package:myfish/features/schedule/schedule_page.dart';
 import 'package:myfish/features/schedule/widgets/delete_schedule_dialog.dart';
 import 'package:myfish/features/schedule/widgets/schedule_card.dart';
+import 'package:myfish/features/schedule/widgets/toggle_schedule_dialog.dart';
 import 'package:myfish/core/constants/app_constants.dart';
 import 'package:myfish/features/schedule/widgets/schedule_form_sheet.dart';
 import 'package:myfish/features/settings/about_app_page.dart';
@@ -119,8 +120,17 @@ class FakeDeviceRepository extends DeviceRepository {
       Stream.value(mockSchedules);
 
   @override
-  Stream<List<HistoryItem>> watchHistory(String uid, {int limit = 50}) =>
+  Stream<List<HistoryItem>> watchHistory(
+    String uid, {
+    int limit = AppConstants.maxHistoryCount,
+  }) =>
       Stream.value(mockHistory);
+
+  @override
+  Future<void> trimHistory(
+    String uid, {
+    int maxItems = AppConstants.maxHistoryCount,
+  }) async {}
 
   final List<ScheduleItem> addedSchedules = [];
   final List<ScheduleItem> updatedSchedules = [];
@@ -196,6 +206,23 @@ class FakeDeviceRepository extends DeviceRepository {
     shutdownCommands.add(uid);
     return 'cmd_shutdown_${shutdownCommands.length}';
   }
+
+  final List<String> wakeupCommands = [];
+  final List<String> deletedCommandIds = [];
+
+  @override
+  Future<String> sendWakeupCommand(String uid) async {
+    wakeupCommands.add(uid);
+    return 'cmd_wakeup_${wakeupCommands.length}';
+  }
+
+  @override
+  Future<void> deleteCommand(String uid, String commandId) async {
+    deletedCommandIds.add(commandId);
+  }
+
+  @override
+  Future<void> cleanCompletedCommands(String uid) async {}
 
   @override
   Future<void> updateCalibration(
@@ -434,6 +461,10 @@ void main() {
   testWidgets(
     'PrivacyPolicyPage menampilkan informasi privasi & tombol kembali',
     (tester) async {
+      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
       await tester.pumpWidget(
         MaterialApp(theme: AppTheme.light, home: const PrivacyPolicyPage()),
       );
@@ -802,8 +833,12 @@ void main() {
     expect(find.text('07:00'), findsOneWidget);
     expect(find.text('17:00'), findsOneWidget);
 
-    // Test toggle switch
+    // Test toggle switch dengan pop up konfirmasi
     await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Nonaktifkan Jadwal?'), findsOneWidget);
+    await tester.tap(find.text('Nonaktifkan'));
+    await tester.pumpAndSettle();
     expect(fakeDevice.toggledSchedules['s1'], false);
   });
 
@@ -882,7 +917,7 @@ void main() {
     expect(deleted, true);
   });
 
-  testWidgets('HistoryPage menampilkan state kosong dan catatan TTL 30 hari', (
+  testWidgets('HistoryPage menampilkan state kosong dan catatan maksimal 25 riwayat', (
     tester,
   ) async {
     final fakeAuth = FakeAuthRepository();
@@ -903,7 +938,9 @@ void main() {
 
     expect(find.text('Riwayat Pakan'), findsOneWidget);
     expect(
-      find.text('Riwayat otomatis terhapus setelah 30 hari'),
+      find.text(
+        'Maksimal 25 riwayat tersimpan (data terlama otomatis terhapus)',
+      ),
       findsOneWidget,
     );
     expect(find.text('Belum ada riwayat pakan'), findsOneWidget);
@@ -1039,7 +1076,7 @@ void main() {
   testWidgets(
     'SettingsPage menampilkan profil alat, menu pengaturan, dan slide keluar',
     (tester) async {
-      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.physicalSize = const Size(800, 3000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
@@ -1175,7 +1212,7 @@ void main() {
   testWidgets(
     'Esp32ControlPage alur Reset: verifikasi password -> slide confirm -> kirim command',
     (tester) async {
-      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.physicalSize = const Size(800, 3000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
@@ -1239,7 +1276,7 @@ void main() {
   testWidgets(
     'Esp32ControlPage alur Shutdown: password -> slide confirm -> kirim command',
     (tester) async {
-      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.physicalSize = const Size(800, 3000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
@@ -1330,7 +1367,7 @@ void main() {
   testWidgets(
     'CalibrationPage stepper, validasi urutan bertambah, password -> slide simpan',
     (tester) async {
-      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.physicalSize = const Size(800, 3000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
@@ -1471,7 +1508,7 @@ void main() {
   testWidgets(
     'AboutAppPage menampilkan deskripsi, fitur, dan dapat menyalin link unduh',
     (tester) async {
-      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.physicalSize = const Size(800, 3000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
@@ -1503,7 +1540,7 @@ void main() {
   testWidgets(
     'AboutDeveloperPage menampilkan profil dan menyalin email & WhatsApp',
     (tester) async {
-      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.physicalSize = const Size(800, 3000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
@@ -1539,7 +1576,7 @@ void main() {
   testWidgets(
     'SupportDeveloperPage menampilkan QRIS dan tombol aksi simpan / bagikan',
     (tester) async {
-      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.physicalSize = const Size(800, 3000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
@@ -1590,7 +1627,7 @@ void main() {
   testWidgets(
     'SettingsPage navigasi ke halaman info dan alur Periksa Pembaruan',
     (tester) async {
-      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.physicalSize = const Size(800, 3000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
@@ -1744,20 +1781,27 @@ void main() {
     expect(find.text('Pembaruan Tersedia!'), findsNothing);
   });
 
-  testWidgets('AppHeader menampilkan branding MyFish dan ikon dekoratif', (
+  testWidgets('AppHeader menampilkan branding MyFish dan status koneksi ESP32', (
     tester,
   ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: const Scaffold(appBar: AppHeader()),
+        home: const Scaffold(appBar: AppHeader(isOnline: true)),
       ),
     );
 
     expect(find.text('MyFish'), findsOneWidget);
-    expect(find.byIcon(Icons.set_meal_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.water_drop_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.waves_rounded), findsOneWidget);
+    expect(find.text('Terhubung'), findsOneWidget);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: const Scaffold(appBar: AppHeader(isOnline: false)),
+      ),
+    );
+
+    expect(find.text('Terputus'), findsOneWidget);
   });
 
   testWidgets('RecentHistorySection menampilkan maks 5 riwayat dan state kosong', (
@@ -1834,4 +1878,231 @@ void main() {
     await tester.tap(find.byIcon(Icons.edit_outlined));
     expect(editTapped, true);
   });
+
+  testWidgets(
+    'DeviceStatusCard tombol Segarkan memicu callback dan memulai cooldown 60 detik',
+    (tester) async {
+      var refreshed = false;
+      final onlineDevice = DeviceData(
+        uid: 'dev_1',
+        status: 'online',
+        lastSeen: DateTime.now(),
+        fwVersion: '1.0.0',
+        calibration: const {},
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: DeviceStatusCard(
+              device: onlineDevice,
+              onRefresh: () async => refreshed = true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Segarkan'), findsOneWidget);
+      await tester.tap(find.text('Segarkan'));
+      await tester.pump();
+
+      expect(refreshed, true);
+      // Cooldown 60s aktif
+      expect(find.text('60s'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'showToggleScheduleDialog menampilkan konfirmasi dan memproses pilihan',
+    (tester) async {
+      bool? result;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () async {
+                  result = await showToggleScheduleDialog(
+                    context,
+                    time: '14:00',
+                    enabled: true,
+                  );
+                },
+                child: const Text('Buka Toggle Dialog'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Buka Toggle Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aktifkan Jadwal?'), findsOneWidget);
+      expect(find.text('Batal'), findsOneWidget);
+      expect(find.text('Aktifkan'), findsOneWidget);
+
+      await tester.tap(find.text('Aktifkan'));
+      await tester.pumpAndSettle();
+
+      expect(result, true);
+    },
+  );
+
+  testWidgets(
+    'Esp32ControlPage alur Nyalakan ESP32 saat deep sleep',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final fakeAuth = FakeAuthRepository();
+      final sleepDevice = DeviceData(
+        uid: 'esp32_user_1',
+        status: 'off',
+        lastSeen: DateTime.now().subtract(const Duration(hours: 1)),
+        fwVersion: '1.0.0',
+        calibration: const {},
+      );
+      final fakeDevice = FakeDeviceRepository(mockDevice: sleepDevice);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Esp32ControlPage(
+            authRepository: fakeAuth,
+            deviceRepository: fakeDevice,
+            uid: 'esp32_user_1',
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('ESP32 Sedang Dimatikan (Mode Deep Sleep)'), findsOneWidget);
+      expect(find.text('Nyalakan ESP32'), findsOneWidget);
+
+      // Tap Nyalakan ESP32
+      await tester.tap(find.text('Nyalakan ESP32'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Konfirmasi Nyalakan ESP32'), findsOneWidget);
+
+      // Masukkan password
+      await tester.enterText(find.byType(TextField), 'validpassword');
+      await tester.tap(find.widgetWithText(AppButton, 'Lanjut'));
+      await tester.pumpAndSettle();
+
+      // Slide modal sheet
+      expect(find.text('Nyalakan Kembali ESP32'), findsOneWidget);
+      expect(find.text('Geser untuk nyalakan ESP32'), findsOneWidget);
+
+      // Konfirmasi slide
+      tester.semantics.tap(find.semantics.byLabel('Geser untuk nyalakan ESP32'));
+      await tester.pumpAndSettle();
+
+      expect(fakeDevice.wakeupCommands.contains('esp32_user_1'), true);
+    },
+  );
+
+  testWidgets(
+    'SchedulePage menampilkan batas 10 jadwal dan menonaktifkan tombol tambah',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final tenSchedules = List.generate(
+        10,
+        (i) => ScheduleItem(
+          id: 's_$i',
+          time: '${(i + 7).toString().padLeft(2, '0')}:00',
+          level: 1,
+          enabled: true,
+        ),
+      );
+
+      final fakeAuth = FakeAuthRepository();
+      final fakeDevice = FakeDeviceRepository(mockSchedules: tenSchedules);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: SchedulePage(
+            uid: 'dev123',
+            authRepository: fakeAuth,
+            deviceRepository: fakeDevice,
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Badge menampilkan 10/10 Jadwal
+      expect(find.text('10/10 Jadwal'), findsOneWidget);
+
+      // Banner peringatan batas maksimal 10 jadwal
+      expect(
+        find.text(
+          'Maksimal 10 jadwal telah tercapai. Hapus salah satu jadwal jika ingin menambah baru.',
+        ),
+        findsOneWidget,
+      );
+
+      // Tombol dinonaktifkan dengan label Batas 10 Jadwal Tercapai
+      expect(find.text('Batas 10 Jadwal Tercapai'), findsOneWidget);
+      final button = tester.widget<AppButton>(
+        find.widgetWithText(AppButton, 'Batas 10 Jadwal Tercapai'),
+      );
+      expect(button.onPressed, isNull);
+    },
+  );
+
+  testWidgets(
+    'ScheduleFormSheet menolak tambah jadwal saat sudah mencapai batas 10',
+    (tester) async {
+      final tenSchedules = List.generate(
+        10,
+        (i) => ScheduleItem(
+          id: 's_$i',
+          time: '${(i + 7).toString().padLeft(2, '0')}:00',
+          level: 1,
+          enabled: true,
+        ),
+      );
+
+      bool saved = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: ScheduleFormSheet(
+              existingSchedules: tenSchedules,
+              onSave: (time, level) async {
+                saved = true;
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Coba simpan jadwal ke-11
+      await tester.tap(find.text('Simpan Jadwal'));
+      await tester.pumpAndSettle();
+
+      expect(saved, false);
+      expect(
+        find.text(
+          'Maksimal 10 jadwal telah tercapai. Hapus salah satu jadwal terlebih dahulu.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }

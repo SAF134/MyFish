@@ -51,7 +51,7 @@ Aplikasi ini terhubung langsung dengan perangkat keras mikrokontroler **ESP32** 
 - Grafik batang aktivitas pakan 7 hari terakhir (*fl_chart*).
 - Daftar 5 riwayat pakan terbaru langsung di layar beranda.
 - Pencatatan lengkap: jam pemberian pakan, dosis (Level 1–5), metode (*Auto* / *Manual*), dan durasi buka katup servo.
-- Kebijakan retensi data otomatis (*Time-To-Live / TTL* 30 hari) di Firestore.
+- Kebijakan retensi data otomatis: maksimal 25 riwayat tersimpan (data terlama otomatis terhapus saat data baru masuk).
 
 ### 5. 🛠️ Kontrol & Kalibrasi Perangkat
 - **Kalibrasi Servo Presisi**: Pengaturan durasi buka katup pakan (0.1 s.d. 10.0 detik) per level dosis.
@@ -168,7 +168,7 @@ flutter test
 
 1. **Keamanan Autentikasi**: Seluruh kredensial akun alat dilindungi menggunakan standar enkripsi Firebase Authentication.
 2. **Isolasi Data Pengguna**: Aturan Cloud Firestore membatasi akses baca dan tulis dokumen hanya untuk pengguna pemilik ID perangkat yang terotentikasi.
-3. **Pembersihan Otomatis**: Riwayat pakan secara teratur dibersihkan melalui fitur Cloud Firestore Time-To-Live (TTL) berbasis field `expireAt`.
+3. **Pembersihan Otomatis**: Riwayat pakan dibatasi maksimal 25 riwayat terakhir dengan rotasi FIFO otomatis (data tertua dihapus saat ada riwayat baru) agar hemat kuota database.
 
 ---
 

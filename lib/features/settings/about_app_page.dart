@@ -182,13 +182,13 @@ class AboutAppPage extends StatelessWidget {
                       _FeatureItem(
                         icon: Icons.alarm_rounded,
                         title: 'Penjadwalan Otomatis',
-                        description: 'Atur jadwal pakan harian terprogram tanpa kekhawatiran jam ganda.',
+                        description: 'Atur hingga 10 jadwal pakan harian terprogram tanpa kekhawatiran jam ganda.',
                       ),
                       const Divider(height: AppSpacing.xl),
                       _FeatureItem(
                         icon: Icons.bar_chart_rounded,
                         title: 'Riwayat & Grafik 7 Hari',
-                        description: 'Visualisasi frekuensi pakan mingguan dan log riwayat otomatis selama 30 hari.',
+                        description: 'Visualisasi frekuensi pakan mingguan dan log hingga 25 riwayat pakan terakhir.',
                       ),
                       const Divider(height: AppSpacing.xl),
                       _FeatureItem(

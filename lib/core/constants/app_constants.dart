@@ -21,7 +21,13 @@ abstract final class AppConstants {
   /// Alat membatalkan perintah yang lebih tua dari 30 dtk.
   static const Duration commandTimeout = Duration(seconds: 30);
 
-  /// Riwayat dihapus otomatis oleh TTL Firestore setelah 30 hari.
+  /// Maksimal dokumen riwayat pakan yang tersimpan (rotasi otomatis FIFO).
+  static const int maxHistoryCount = 25;
+
+  /// Maksimal jadwal pakan yang dapat dibuat oleh pengguna.
+  static const int maxScheduleCount = 10;
+
+  /// Riwayat dibatasi maksimal 25 data (data terlama otomatis terhapus saat data baru masuk).
   static const Duration historyRetention = Duration(days: 30);
 
   /// Cooldown tombol Periksa Pembaruan.

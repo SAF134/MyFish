@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../data/models/device_models.dart';
@@ -91,6 +92,16 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
 
   Future<void> _submit() async {
     final timeStr = _formattedTime;
+
+    // Validasi batas maksimal 10 jadwal jika membuat baru
+    if (!_isEdit &&
+        widget.existingSchedules.length >= AppConstants.maxScheduleCount) {
+      setState(() {
+        _errorMessage =
+            'Maksimal ${AppConstants.maxScheduleCount} jadwal telah tercapai. Hapus salah satu jadwal terlebih dahulu.';
+      });
+      return;
+    }
 
     // Validasi jam tidak boleh ganda (AGENTS.md & PRD)
     final isDuplicate = widget.existingSchedules.any((s) {

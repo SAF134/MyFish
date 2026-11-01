@@ -49,6 +49,11 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadDeviceName();
+    final uid = _effectiveUid;
+    if (uid != null) {
+      _deviceRepository.cleanCompletedCommands(uid);
+      _deviceRepository.trimHistory(uid);
+    }
   }
 
   Future<void> _loadDeviceName() async {
@@ -99,7 +104,10 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: const AppHeader(),
+      appBar: AppHeader(
+        authRepository: _authRepository,
+        deviceRepository: _deviceRepository,
+      ),
       body: SafeArea(
         top: false,
         child: Align(
@@ -174,6 +182,8 @@ class _HomePageState extends State<HomePage> {
                                             DeviceStatusCard(
                                               device: device,
                                               deviceName: name,
+                                              onRefresh: () async =>
+                                                  setState(() {}),
                                             ),
                                             const SizedBox(
                                               height: AppSpacing.xl,
@@ -237,6 +247,7 @@ class _HomePageState extends State<HomePage> {
                                   DeviceStatusCard(
                                     device: device,
                                     deviceName: name,
+                                    onRefresh: () async => setState(() {}),
                                   ),
                                   const SizedBox(height: AppSpacing.xl),
 

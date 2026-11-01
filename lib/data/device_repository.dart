@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/constants/app_constants.dart';
 import 'models/device_models.dart';
 
 /// Model item direktori alat dari koleksi `device_directory`.
@@ -99,12 +100,25 @@ class DeviceRepository {
   }
 
   /// Menambahkan jadwal pakan baru ke `devices/{uid}/schedules`.
+  /// Dibatasi maksimal [AppConstants.maxScheduleCount] (10 jadwal).
   Future<String> addSchedule(
     String uid, {
     required String time,
     required int level,
     bool enabled = true,
   }) async {
+    final existingSnapshot = await _firestore
+        .collection('devices')
+        .doc(uid)
+        .collection('schedules')
+        .get();
+
+    if (existingSnapshot.docs.length >= AppConstants.maxScheduleCount) {
+      throw StateError(
+        'Batas maksimal ${AppConstants.maxScheduleCount} jadwal pakan telah tercapai.',
+      );
+    }
+
     final docRef = await _firestore
         .collection('devices')
         .doc(uid)
@@ -154,19 +168,52 @@ class DeviceRepository {
   }
 
   /// Memantau riwayat pakan secara realtime `devices/{uid}/history`.
-  Stream<List<HistoryItem>> watchHistory(String uid, {int limit = 50}) {
+  /// Dibatasi maksimal [limit] data (default [AppConstants.maxHistoryCount] = 25).
+  /// Jika data riwayat melebihi batas, data yang paling lama akan otomatis dipangkas.
+  Stream<List<HistoryItem>> watchHistory(
+    String uid, {
+    int limit = AppConstants.maxHistoryCount,
+  }) {
     return _firestore
         .collection('devices')
         .doc(uid)
         .collection('history')
         .orderBy('timestamp', descending: true)
-        .limit(limit)
         .snapshots()
         .map((snapshot) {
+          if (snapshot.docs.length > limit) {
+            trimHistory(uid, maxItems: limit);
+          }
           return snapshot.docs
+              .take(limit)
               .map((d) => HistoryItem.fromFirestore(d))
               .toList();
         });
+  }
+
+  /// Memastikan jumlah riwayat tidak melebihi [maxItems] (default 25 data).
+  /// Jika riwayat melebihi batas, data yang paling lama otomatis dihapus dari Firestore.
+  Future<void> trimHistory(
+    String uid, {
+    int maxItems = AppConstants.maxHistoryCount,
+  }) async {
+    try {
+      final snapshot = await _firestore
+          .collection('devices')
+          .doc(uid)
+          .collection('history')
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      if (snapshot.docs.length > maxItems) {
+        final docsToDelete = snapshot.docs.sublist(maxItems);
+        final batch = _firestore.batch();
+        for (final doc in docsToDelete) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+    } catch (_) {}
   }
 
   /// Menghapus dokumen item riwayat pakan dari `devices/{uid}/history/{id}`.
@@ -223,6 +270,24 @@ class DeviceRepository {
     return docRef.id;
   }
 
+  /// Membuat dokumen perintah bangun / nyalakan kembali ESP32 di `devices/{uid}/commands`.
+  Future<String> sendWakeupCommand(String uid) async {
+    final docRef = await _firestore
+        .collection('devices')
+        .doc(uid)
+        .collection('commands')
+        .add({
+          'type': 'wakeup',
+          'status': 'pending',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+    await _firestore.collection('devices').doc(uid).set({
+      'status': 'standby',
+      'lastSeen': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    return docRef.id;
+  }
+
   /// Memperbarui nilai durasi kalibrasi servo level 1–5 di `devices/{uid}`.
   Future<void> updateCalibration(
     String uid,
@@ -245,6 +310,37 @@ class DeviceRepository {
           if (!doc.exists) return null;
           return DeviceCommand.fromFirestore(doc);
         });
+  }
+
+  /// Menghapus dokumen perintah dari `devices/{uid}/commands/{commandId}`
+  /// setelah selesai dieksekusi agar database Firestore tetap bersih dan hemat kuota.
+  Future<void> deleteCommand(String uid, String commandId) async {
+    try {
+      await _firestore
+          .collection('devices')
+          .doc(uid)
+          .collection('commands')
+          .doc(commandId)
+          .delete();
+    } catch (_) {}
+  }
+
+  /// Membersihkan perintah-perintah lama yang sudah selesai atau gagal.
+  Future<void> cleanCompletedCommands(String uid) async {
+    try {
+      final snapshot = await _firestore
+          .collection('devices')
+          .doc(uid)
+          .collection('commands')
+          .where('status', whereIn: ['done', 'failed'])
+          .get();
+
+      final batch = _firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } catch (_) {}
   }
 
   /// Mengambil konfigurasi pembaruan aplikasi dari `app_config/version`.

@@ -56,7 +56,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                 _buildSection(
                   context,
                   title: '2. Penggunaan Data',
-                  content: 'Data yang tersimpan meliputi status online/offline, jadwal pemberian pakan, serta riwayat pakan (waktu, level takaran, dan durasi). Data riwayat pakan otomatis terhapus setelah 30 hari melalui kebijakan retensi sistem Firestore TTL.',
+                  content: 'Data yang tersimpan meliputi status online/offline, jadwal pemberian pakan, serta riwayat pakan (waktu, level takaran, dan durasi). Data riwayat pakan dibatasi maksimal 25 riwayat terakhir dengan rotasi otomatis (riwayat terlama otomatis dihapus saat ada riwayat baru masuk).',
                 ),
                 _buildSection(
                   context,

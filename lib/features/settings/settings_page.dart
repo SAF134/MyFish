@@ -206,34 +206,32 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text('Keluar dari Akun?'),
         content: Text(
           'Anda akan keluar dari akun alat ini dan perlu memasukkan password kembali untuk mengakses dashboard.',
+          textAlign: TextAlign.center,
           style: textTheme.bodyMedium?.copyWith(
             color: AppColors.textMuted,
-            height: 1.4,
           ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.xxl,
+          0,
+          AppSpacing.xxl,
+          AppSpacing.xxl,
         ),
         actions: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Tombol "Keluar" di kiri
-              TextButton(
-                onPressed: () => Navigator.of(dialogCtx).pop(true),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                ),
-                child: const Text(
-                  'Keluar',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+              Expanded(
+                child: AppButton.danger(
+                  label: 'Keluar',
+                  onPressed: () => Navigator.of(dialogCtx).pop(true),
                 ),
               ),
-
-              // Tombol "Batal" di kanan
-              AppButton.secondary(
-                label: 'Batal',
-                expanded: false,
-                onPressed: () => Navigator.of(dialogCtx).pop(false),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: AppButton.secondary(
+                  label: 'Batal',
+                  onPressed: () => Navigator.of(dialogCtx).pop(false),
+                ),
               ),
             ],
           ),
@@ -254,7 +252,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: const AppHeader(),
+      appBar: AppHeader(
+        authRepository: _authRepository,
+        deviceRepository: _deviceRepository,
+      ),
       body: SafeArea(
         top: false,
         child: Align(

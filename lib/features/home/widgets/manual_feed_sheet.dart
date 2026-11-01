@@ -98,11 +98,15 @@ class _ManualFeedSheetState extends State<ManualFeedSheet> {
               } else if (cmd.status == 'done') {
                 _timeoutTimer?.cancel();
                 _commandSubscription?.cancel();
+                // Hapus dokumen perintah yang sudah sukses agar tidak menumpuk di database
+                widget.deviceRepository.deleteCommand(widget.uid, commandId);
                 if (!completer.isCompleted) completer.complete();
                 Navigator.of(context).pop(_selectedLevel);
               } else if (cmd.status == 'failed') {
                 _timeoutTimer?.cancel();
                 _commandSubscription?.cancel();
+                // Hapus dokumen perintah yang gagal
+                widget.deviceRepository.deleteCommand(widget.uid, commandId);
                 setState(() {
                   _isProcessing = false;
                   _errorMessage = 'Pemberian pakan gagal dieksekusi oleh alat';

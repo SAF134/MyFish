@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../data/auth_repository.dart';
@@ -13,6 +14,7 @@ import '../../widgets/state_views.dart';
 import 'widgets/delete_schedule_dialog.dart';
 import 'widgets/schedule_card.dart';
 import 'widgets/schedule_form_sheet.dart';
+import 'widgets/toggle_schedule_dialog.dart';
 
 /// Halaman kelola Jadwal Pakan (DESIGN.md §6).
 class SchedulePage extends StatefulWidget {
@@ -44,6 +46,14 @@ class _SchedulePageState extends State<SchedulePage> {
     String uid,
     List<ScheduleItem> existing,
   ) async {
+    if (existing.length >= AppConstants.maxScheduleCount) {
+      AppSnackbar.error(
+        context,
+        'Batas maksimal ${AppConstants.maxScheduleCount} jadwal telah tercapai. Hapus salah satu jadwal jika ingin menambah baru.',
+      );
+      return;
+    }
+
     await ScheduleFormSheet.show(
       context,
       existingSchedules: existing,
@@ -81,12 +91,27 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  Future<void> _toggleSchedule(
+  Future<void> _handleToggleSchedule(
+    BuildContext context,
     String uid,
     ScheduleItem item,
     bool enabled,
   ) async {
-    await _deviceRepository.toggleSchedule(uid, id: item.id, enabled: enabled);
+    final confirmed = await showToggleScheduleDialog(
+      context,
+      time: item.time,
+      enabled: enabled,
+    );
+
+    if (confirmed) {
+      await _deviceRepository.toggleSchedule(uid, id: item.id, enabled: enabled);
+      if (context.mounted) {
+        AppSnackbar.success(
+          context,
+          enabled ? 'Jadwal diaktifkan' : 'Jadwal dinonaktifkan',
+        );
+      }
+    }
   }
 
   Future<void> _confirmDeleteSchedule(
@@ -130,7 +155,10 @@ class _SchedulePageState extends State<SchedulePage> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: const AppHeader(),
+      appBar: AppHeader(
+        authRepository: _authRepository,
+        deviceRepository: _deviceRepository,
+      ),
       body: SafeArea(
         top: false,
         child: Align(
@@ -188,6 +216,8 @@ class _SchedulePageState extends State<SchedulePage> {
                     }
 
                     final schedules = schedulesSnapshot.data ?? [];
+                    final isMaxSchedules =
+                        schedules.length >= AppConstants.maxScheduleCount;
 
                     return ListView(
                       padding: const EdgeInsets.fromLTRB(
@@ -219,19 +249,25 @@ class _SchedulePageState extends State<SchedulePage> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.primaryTint,
+                                color: isMaxSchedules
+                                    ? AppColors.error.withValues(alpha: 0.12)
+                                    : AppColors.primaryTint,
                                 borderRadius:
                                     BorderRadius.circular(AppRadius.chip),
                                 border: Border.all(
-                                  color: AppColors.primaryLight
-                                      .withValues(alpha: 0.3),
+                                  color: isMaxSchedules
+                                      ? AppColors.error.withValues(alpha: 0.3)
+                                      : AppColors.primaryLight
+                                          .withValues(alpha: 0.3),
                                   width: 1.0,
                                 ),
                               ),
                               child: Text(
-                                '${schedules.length} Jadwal',
+                                '${schedules.length}/${AppConstants.maxScheduleCount} Jadwal',
                                 style: textTheme.labelSmall?.copyWith(
-                                  color: AppColors.primaryDark,
+                                  color: isMaxSchedules
+                                      ? AppColors.error
+                                      : AppColors.primaryDark,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -278,15 +314,13 @@ class _SchedulePageState extends State<SchedulePage> {
 
                         // Daftar Jadwal atau State Kosong
                         if (schedules.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: AppSpacing.xl),
+                          const Padding(
+                            padding: EdgeInsets.only(top: AppSpacing.xl),
                             child: EmptyView(
                               icon: Icons.alarm_rounded,
                               title: 'Belum ada jadwal',
-                              message: 'Buat jadwal pakan harian agar ikan Anda mendapatkan pakan tepat waktu secara otomatis.',
-                              actionLabel: 'Tambah Jadwal',
-                              onAction: () =>
-                                  _openAddSchedule(context, uid, schedules),
+                              message:
+                                  'Buat jadwal pakan harian agar ikan Anda mendapatkan pakan tepat waktu secara otomatis.',
                             ),
                           )
                         else
@@ -301,8 +335,12 @@ class _SchedulePageState extends State<SchedulePage> {
                                 schedules[i],
                                 schedules,
                               ),
-                              onToggle: (val) =>
-                                  _toggleSchedule(uid, schedules[i], val),
+                              onToggle: (val) => _handleToggleSchedule(
+                                context,
+                                uid,
+                                schedules[i],
+                                val,
+                              ),
                               onDelete: () => _confirmDeleteSchedule(
                                 context,
                                 uid,
@@ -310,14 +348,54 @@ class _SchedulePageState extends State<SchedulePage> {
                               ),
                             ),
                           ],
-                          const SizedBox(height: AppSpacing.lg),
-                          // Tombol Tambah Jadwal tunggal di bawah daftar jadwal
-                          AppButton.primary(
-                            label: 'Tambah Jadwal',
-                            icon: Icons.add_rounded,
-                            onPressed: () =>
-                                _openAddSchedule(context, uid, schedules),
+                        const SizedBox(height: AppSpacing.lg),
+                        if (isMaxSchedules) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceAlt,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.input),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 18,
+                                  color: AppColors.textMuted,
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Text(
+                                    'Maksimal 10 jadwal telah tercapai. Hapus salah satu jadwal jika ingin menambah baru.',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textMuted,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
+                        // Tombol Tambah Jadwal tunggal di bawah daftar jadwal
+                        AppButton.primary(
+                          label: isMaxSchedules
+                              ? 'Batas 10 Jadwal Tercapai'
+                              : 'Tambah Jadwal',
+                          icon: isMaxSchedules
+                              ? Icons.lock_outline_rounded
+                              : Icons.add_rounded,
+                          onPressed: isMaxSchedules
+                              ? null
+                              : () =>
+                                  _openAddSchedule(context, uid, schedules),
+                        ),
                       ],
                     );
                   },
